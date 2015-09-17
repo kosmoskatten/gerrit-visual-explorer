@@ -1,0 +1,4 @@
+resolver: lts-3.5
+packages:
+- ./source-fetcher
+extra-deps: []
