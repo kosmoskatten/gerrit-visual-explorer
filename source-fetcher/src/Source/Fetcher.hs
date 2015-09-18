@@ -1,17 +1,21 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Source.Fetcher
-    ( CommitInfo (..) 
-    , Url (..)
-    , fetchCommitInfo
+    ( fetchCommitInfo
     , fetchFileInfo
     ) where
 
 import Control.Monad (forM)
-import Data.Aeson
-import Data.Aeson.Types
-import Data.Text (Text)
-import Data.Time (UTCTime)
-import Network.HTTP.Conduit
+import Data.Aeson (decode)
+import Data.Aeson.Types (Object, Value (..), (.:), parseMaybe)
+import Source.Types (CommitInfo (..), FileInfo (..))
+import Network.HTTP.Conduit ( Manager
+                            , Request (..)
+                            , httpLbs
+                            , newManager
+                            , parseUrl
+                            , responseBody
+                            , tlsManagerSettings
+                            )
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import qualified Data.HashMap.Strict as HM
 import qualified Data.Text as T
@@ -22,20 +26,7 @@ data Url = MergedChanges !String
          | FileList !String
     deriving Show
 
-data CommitInfo = 
-    CommitInfo { change_id  :: !Text
-               , created    :: !UTCTime
-               , updated    :: !UTCTime
-               , insertions :: !Int
-               , deletions  :: !Int }
-    deriving Show
-
-data FileInfo =
-    FileInfo { filePath      :: !Text
-             , linesDeleted  :: !Int
-             , linesInserted :: !Int }
-    deriving Show
-
+-- | Fetch commit info from the specified server.
 fetchCommitInfo :: Manager -> Server -> IO (Maybe [CommitInfo])
 fetchCommitInfo mgr server = 
     toCommitInfo <$> (getJSON mgr server $ MergedChanges "bbi/bbi")
@@ -43,6 +34,7 @@ fetchCommitInfo mgr server =
         toCommitInfo :: LBS.ByteString -> Maybe [CommitInfo]
         toCommitInfo lbs = mapM commitInfo =<< toObjects lbs
 
+-- | Fetch file info from the server given the commit info.
 fetchFileInfo :: Manager -> Server -> CommitInfo -> IO (Maybe [FileInfo])
 fetchFileInfo mgr server ci =
     toFileInfo <$> (getJSON mgr server $ FileList (T.unpack $ change_id ci))
@@ -50,6 +42,9 @@ fetchFileInfo mgr server ci =
         toFileInfo :: LBS.ByteString -> Maybe [FileInfo]
         toFileInfo lbs = fileInfo =<< decode lbs
 
+-- | Fetch stuff from the Gerrit server. Always authorize using HTTP
+-- authorization. Also drop five bytes fron the body, which are added
+-- by the Gerrit server.
 getJSON :: Manager -> Server -> Url -> IO LBS.ByteString
 getJSON mgr server url = do
     let url' = server `mappend` expand url
@@ -60,6 +55,7 @@ getJSON mgr server url = do
       where
         auth = ("Authorization", "Basic dWFicGFzYTpTbXVyckUxMiE=")
 
+-- | Expand "typesafe" URL:s to strings.
 expand :: Url -> String
 expand (MergedChanges project) = 
     "/a/changes/?q=project:" `mappend` project 
@@ -71,14 +67,17 @@ expand (FileList cid) =
 toObjects :: LBS.ByteString -> Maybe [Object]
 toObjects = decode
 
+-- | Tailor made JSON parsing of an Object to a CommitInto structure.
 commitInfo :: Object -> Maybe CommitInfo
 commitInfo obj = flip parseMaybe obj $ 
     \o -> CommitInfo <$> o .: "id"
+                     <*> o .: "subject"
                      <*> (read <$> o .: "created")
                      <*> (read <$> o .: "updated")
                      <*> o .: "insertions"
                      <*> o .: "deletions"
 
+-- | Tailor made JSON parsing of an Object to a FileInfo structure.
 fileInfo :: Object -> Maybe [FileInfo]
 fileInfo obj =
     let xs = filter (\(k, _) -> k /= "/COMMIT_MSG") $ HM.toList obj
