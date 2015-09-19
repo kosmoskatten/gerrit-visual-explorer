@@ -1,4 +1,5 @@
 resolver: lts-3.5
 packages:
 - ./source-fetcher
+- ./data-store
 extra-deps: []
