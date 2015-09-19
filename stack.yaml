@@ -1,5 +1,5 @@
 resolver: lts-3.5
 packages:
-- ./source-fetcher
-- ./data-store
+- ./gerrit-source
+- ./gerrit-store
 extra-deps: []
