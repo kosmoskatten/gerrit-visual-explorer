@@ -1,15 +1,17 @@
-{-# LANGUAGE ExistentialQuantification #-}
 module Gerrit.Store.Types
     ( CommitData (..)
     , CommitEntry (..)
     , Change (..)
     , File (..)
+    , CommitSet 
+    , FileMap
     , emptyCommitData
+    , emptyFile
     ) where
 
+import Control.Concurrent.STM (STM, TVar, newTVar)
 import Data.HashMap.Strict (HashMap)
 import Data.HashSet (HashSet)
-import Data.STRef (STRef)
 import Data.Text (Text)
 import Data.Time (UTCTime)
 import Data.Vector (Vector)
@@ -33,9 +35,11 @@ data Change =
     deriving Show
 
 data File = 
-    forall s. File { name   :: !Text
-                   , partOf :: STRef s TimeLine
-                   }
+    File { name   :: !Text
+         , partOf :: TVar TimeLine
+         -- ^ The timeline shall be mutable. Its mutable by means
+         -- of TVar. 
+         }
 
 instance Show File where
     show f = ""
@@ -55,3 +59,6 @@ emptyCommitData :: CommitData
 emptyCommitData = CommitData { timeLine  = Vector.empty
                              , fileMap   = HashMap.empty
                              , commitSet = HashSet.empty } 
+
+emptyFile :: Text -> STM File
+emptyFile name' = File name' <$> newTVar Vector.empty

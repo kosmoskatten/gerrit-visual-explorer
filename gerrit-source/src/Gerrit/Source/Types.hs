@@ -12,7 +12,7 @@ import Data.Time (UTCTime)
 
 -- | General commit info for a Gerrit commit.
 data GerritCommitInfo = 
-    GerritCommitInfo { commitId      :: !Text
+    GerritCommitInfo { changeId      :: !Text
                      -- ^ The selected commit id which is change_id 
                      -- from Gerrit.
                      , commitSubject :: !Text

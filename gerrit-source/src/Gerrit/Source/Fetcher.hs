@@ -51,7 +51,7 @@ fetchCommitInfo mgr server =
 fetchFileInfo :: Manager -> Server -> GerritCommitInfo 
               -> IO (Maybe [GerritFileInfo])
 fetchFileInfo mgr server ci =
-    toFileInfo <$> (getJSON mgr server $ FileList (T.unpack $ commitId ci))
+    toFileInfo <$> (getJSON mgr server $ FileList (T.unpack $ changeId ci))
       where
         toFileInfo :: LBS.ByteString -> Maybe [GerritFileInfo]
         toFileInfo lbs = fileInfo =<< decode lbs
