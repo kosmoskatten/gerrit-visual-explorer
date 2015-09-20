@@ -1,6 +1,6 @@
 -- | Module which declare "raw" data fetched directly from a Gerrit
 -- server.
-module Source.Types
+module Gerrit.Source.Types
     ( CommitInfo (..)
     , FileInfo (..)
     ) where

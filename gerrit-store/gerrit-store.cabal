@@ -16,8 +16,8 @@ build-type:          Simple
 cabal-version:       >=1.10
 
 library
-  exposed-modules:     Store.Insert
-                       Store.Types
+  exposed-modules:     Gerrit.Store.Insert
+                       Gerrit.Store.Types
   -- other-modules:       
   -- other-extensions:    
   build-depends:       base >=4.8 && <4.9

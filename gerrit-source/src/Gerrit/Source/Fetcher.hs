@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Source.Fetcher
+module Gerrit.Source.Fetcher
     ( fetchCommitInfo
     , fetchFileInfo
     ) where
@@ -7,7 +7,7 @@ module Source.Fetcher
 import Control.Monad (forM)
 import Data.Aeson (decode)
 import Data.Aeson.Types (Object, Value (..), (.:), parseMaybe)
-import Source.Types (CommitInfo (..), FileInfo (..))
+import Gerrit.Source.Types (CommitInfo (..), FileInfo (..))
 import Network.HTTP.Conduit ( Manager
                             , Request (..)
                             , httpLbs

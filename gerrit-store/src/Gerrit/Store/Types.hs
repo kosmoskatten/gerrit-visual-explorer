@@ -1,5 +1,5 @@
 {-# LANGUAGE ExistentialQuantification #-}
-module Store.Types
+module Gerrit.Store.Types
     ( CommitData (..)
     , CommitEntry (..)
     , Change (..)
