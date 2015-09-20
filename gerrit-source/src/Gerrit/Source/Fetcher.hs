@@ -1,13 +1,19 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Gerrit.Source.Fetcher
-    ( fetchCommitInfo
+    ( fetchCommits
+    , fetchCommitInfo
     , fetchFileInfo
     ) where
 
 import Control.Monad (forM)
 import Data.Aeson (decode)
 import Data.Aeson.Types (Object, Value (..), (.:), parseMaybe)
-import Gerrit.Source.Types (CommitInfo (..), FileInfo (..))
+import Data.ByteString (ByteString)
+import Gerrit.Source.Types ( GerritCommitInfo (..)
+                           , GerritFileInfo (..)
+                           , GerritCommitFilter
+                           , GerritCommitEntry
+                           )
 import Network.HTTP.Conduit ( Manager
                             , Request (..)
                             , httpLbs
@@ -20,26 +26,34 @@ import qualified Data.ByteString.Lazy.Char8 as LBS
 import qualified Data.HashMap.Strict as HM
 import qualified Data.Text as T
 
-type Server = String
+type Credentials = ByteString
+type Server      = String
 
 data Url = MergedChanges !String
          | FileList !String
     deriving Show
 
+-- | Fetch commits from the specified server and using the given
+-- credentials and commit filter.
+fetchCommits :: Server -> Credentials -> GerritCommitFilter 
+             -> IO (Maybe [GerritCommitEntry]) 
+fetchCommits = undefined
+
 -- | Fetch commit info from the specified server.
-fetchCommitInfo :: Manager -> Server -> IO (Maybe [CommitInfo])
+fetchCommitInfo :: Manager -> Server -> IO (Maybe [GerritCommitInfo])
 fetchCommitInfo mgr server = 
     toCommitInfo <$> (getJSON mgr server $ MergedChanges "bbi/bbi")
       where 
-        toCommitInfo :: LBS.ByteString -> Maybe [CommitInfo]
+        toCommitInfo :: LBS.ByteString -> Maybe [GerritCommitInfo]
         toCommitInfo lbs = mapM commitInfo =<< toObjects lbs
 
 -- | Fetch file info from the server given the commit info.
-fetchFileInfo :: Manager -> Server -> CommitInfo -> IO (Maybe [FileInfo])
+fetchFileInfo :: Manager -> Server -> GerritCommitInfo 
+              -> IO (Maybe [GerritFileInfo])
 fetchFileInfo mgr server ci =
-    toFileInfo <$> (getJSON mgr server $ FileList (T.unpack $ change_id ci))
+    toFileInfo <$> (getJSON mgr server $ FileList (T.unpack $ commitId ci))
       where
-        toFileInfo :: LBS.ByteString -> Maybe [FileInfo]
+        toFileInfo :: LBS.ByteString -> Maybe [GerritFileInfo]
         toFileInfo lbs = fileInfo =<< decode lbs
 
 -- | Fetch stuff from the Gerrit server. Always authorize using HTTP
@@ -68,9 +82,9 @@ toObjects :: LBS.ByteString -> Maybe [Object]
 toObjects = decode
 
 -- | Tailor made JSON parsing of an Object to a CommitInto structure.
-commitInfo :: Object -> Maybe CommitInfo
+commitInfo :: Object -> Maybe GerritCommitInfo
 commitInfo obj = flip parseMaybe obj $ 
-    \o -> CommitInfo <$> o .: "id"
+    \o -> GerritCommitInfo <$> o .: "id"
                      <*> o .: "subject"
                      <*> (read <$> o .: "created")
                      <*> (read <$> o .: "updated")
@@ -78,14 +92,14 @@ commitInfo obj = flip parseMaybe obj $
                      <*> o .: "deletions"
 
 -- | Tailor made JSON parsing of an Object to a FileInfo structure.
-fileInfo :: Object -> Maybe [FileInfo]
+fileInfo :: Object -> Maybe [GerritFileInfo]
 fileInfo obj =
     let xs = filter (\(k, _) -> k /= "/COMMIT_MSG") $ HM.toList obj
     in forM xs $ \(k, Object o) -> do
         (ins, del) <- fileChanges o
-        Just $ FileInfo { filePath      = k
-                        , linesDeleted  = del
-                        , linesInserted = ins }
+        Just $ GerritFileInfo { filePath      = k
+                              , linesDeleted  = del
+                              , linesInserted = ins }
 
 fileChanges :: Object -> Maybe (Int, Int)
 fileChanges obj = flip parseMaybe obj $ 
