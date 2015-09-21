@@ -4,6 +4,7 @@ module Gerrit.Store.Types
     , Change (..)
     , File (..)
     , CommitSet
+    , FileMap
     , FileHash
     , emptyStore
     ) where

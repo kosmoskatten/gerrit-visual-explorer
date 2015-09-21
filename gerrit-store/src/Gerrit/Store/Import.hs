@@ -11,18 +11,36 @@ import Data.Maybe (fromJust)
 import Data.Text (Text)
 import Gerrit.Source.Types
 import Gerrit.Store.Types
-import qualified Data.HashMap.Strict as HashMap
+import qualified Data.HashMap.Strict as HM
 import qualified Data.HashSet as HS
-import qualified Data.Vector as Vector
+import qualified Data.Vector as V
 
--- | A temporary file map that will
+-- | A temporary file map that will serve as a scratchpad until updating
+-- the real FileMap. The TempFileMap works on lists instead of Vectors,
+-- and is more efficient to incrementally build up.
 type TempFileMap = HashMap FileHash (Text, [CommitEntry])
 
+-- | Import gerrit commits into the store.
 importCommits :: [GerritCommitEntry] -> CommitStore -> CommitStore
-importCommits entries store@CommitStore {..} =
-    let (commitSet', entries') = foldl' syncWithCommits
-                                        (commitSet, []) entries
-    in store 
+importCommits [] store            = store
+importCommits es CommitStore {..} =
+    -- First. Make sure to filter commits that already are present, and
+    -- update the commit set with the new commits.
+    let (commitSet', es') = foldl' syncWithCommits (commitSet, []) es
+
+        -- Next process each gerrit entry to get commit entries instead.
+        (tfm', ces)       = foldl' processEntry (HM.empty, []) es'
+
+        -- Now update the FileMap where each file has its timeline of
+        -- commits.
+        fileMap'          = foldl' updateFileMap fileMap (HM.toList tfm')
+
+    -- Finally, create the new CommitStore.
+    in CommitStore 
+       { timeLine  = V.concat [ timeLine, V.fromList ces]
+       , fileMap   = fileMap'
+       , commitSet = commitSet'
+       }
 
 -- | Sync a gerrit commit entry with the commit set. If the entry already
 -- is present it will be discarded. If not present it will be kept and
@@ -34,85 +52,43 @@ syncWithCommits acc@(cs, xs) entry@(GerritCommitInfo {..}, _)
     | not (HS.member changeId cs) = (HS.insert changeId cs, entry:xs)
     | otherwise                   = acc
 
+-- | Process a gerrit entry into a CommitEntry.
 processEntry :: (TempFileMap, [CommitEntry])
              -> GerritCommitEntry
              -> (TempFileMap, [CommitEntry])
-processEntry = undefined
+processEntry (tfm, xs) (GerritCommitInfo {..}, files) =
+    let changeList  = map mkChange files
+        commitEntry = CommitEntry { timeStamp = updated
+                                  , commitId  = changeId
+                                  , subject   = commitSubject
+                                  , changes   = V.fromList changeList
+                                  }
+        filePaths   = map filePath files
+        tfm'        = foldl' (annotateFilePath commitEntry) tfm filePaths
+    in (tfm', commitEntry:xs)
 
-{-type TempFileMap = HashMap Text [CommitEntry]
-
-insertCommitEntries :: [GerritCommitEntry] -> CommitData -> IO CommitData
-insertCommitEntries xs CommitData {..} = do
-    let (commitSet', prepEntries) = foldl' prepareCommitEntry 
-                                           (commitSet, []) xs
-        files                     = concatMap extractFileInfo xs
-    fileMap' <- atomically (foldM updateFileMap fileMap files)
-    let (_, tfm, compEntries)     = foldl' completeCommitEntry
-                                           (fileMap', HashMap.empty, [])
-                                           prepEntries
-        compEntries'              = Vector.fromList compEntries
-    atomically $ mapM_ (updateFileTimeLine fileMap') (HashMap.toList tfm)
-    return CommitData { timeLine  = Vector.concat [timeLine, compEntries']
-                      , fileMap   = fileMap'
-                      , commitSet = commitSet' } 
-
--- | Prepare a CommitEntry. To be prepared, check if the commit already 
--- is present in the CommitSet. If so, no further actions are made.
--- If not present, a CommitEntry with an empty changes vector is prepared,
--- and the CommitSet is updated accordingly.
-prepareCommitEntry :: (CommitSet, [(CommitEntry, GerritCommitEntry)]) 
-                   -> GerritCommitEntry 
-                   -> (CommitSet, [(CommitEntry, GerritCommitEntry)])
-prepareCommitEntry acc@(cs, xs) gce@(GerritCommitInfo {..}, _)
-    | not (HashSet.member changeId cs) =
-        let commitEntry = CommitEntry { timeStamp = updated
-                                      , commitId  = changeId
-                                      , subject   = commitSubject
-                                      , changes   = Vector.empty
-                                      }
-            cs'         = HashSet.insert changeId cs
-        in (cs', (commitEntry, gce):xs) 
-    | otherwise                        = acc
-
--- | Update the FileMap. If a file not is present in the map, insert
--- an "empty" file.
-updateFileMap :: FileMap -> GerritFileInfo -> STM FileMap
-updateFileMap fm GerritFileInfo {..}
-    | not (HashMap.member filePath fm) = do
-        newFile <- emptyFile filePath
-        return (HashMap.insert filePath newFile fm)
-    | otherwise                        = return fm
-
-completeCommitEntry :: (FileMap, TempFileMap, [CommitEntry])
-                    -> (CommitEntry, GerritCommitEntry)
-                    -> (FileMap, TempFileMap, [CommitEntry])
-completeCommitEntry (fm, tfm, xs) (ce, (_, fileInfos)) =
-    let changes' = map (prepareChange fm) fileInfos
-        ce'      = ce { changes = Vector.fromList changes' }
-        files    = map extractFile fileInfos
-        tfm'     = foldl' (updateFileWithCommit ce') tfm files
-    in (fm, tfm, ce':xs)
-
-prepareChange :: FileMap -> GerritFileInfo -> Change
-prepareChange fileMap GerritFileInfo {..} =
-    -- In the updated file map be can assume that the requested file
-    -- always is present.
+-- | Make a Change record from the content of a gerrit file info.
+mkChange :: GerritFileInfo -> Change
+mkChange GerritFileInfo {..} =
     Change { insertions = linesInserted
            , deletions  = linesDeleted
-           , file       = fromJust (HashMap.lookup filePath fileMap) }
+           , fileRef    = hash filePath
+           }
 
-updateFileWithCommit :: CommitEntry -> TempFileMap -> Text -> TempFileMap
-updateFileWithCommit ce tfm name =
-    HashMap.insertWith (\[new] old -> new:old) name [ce] tfm  
+-- | Annotate a file path in the TempFileMap with a CommitEntry.
+annotateFilePath :: CommitEntry -> TempFileMap -> Text -> TempFileMap
+annotateFilePath entry tfm name = 
+    HM.insertWith insertValue (hash name) (name, [entry]) tfm 
+        where insertValue (_, [new]) (n, xs) = (n, new:xs)
 
-updateFileTimeLine :: FileMap -> (Text, [CommitEntry]) -> STM ()
-updateFileTimeLine fm (name, xs) = do
-    let ceVec = Vector.fromList xs
-        file  = fromJust (HashMap.lookup name fm)
-    modifyTVar' (partOf file) (\oldVec -> Vector.concat [oldVec, ceVec])
+-- | Update an entry in the FileMap with contents taken from the
+-- temporary file map.
+updateFileMap :: FileMap -> (FileHash, (Text, [CommitEntry])) -> FileMap
+updateFileMap fm (key, (name', xs)) =
+    HM.insertWith insertValue key 
+                       File { name   = name'
+                            , partOf = V.fromList xs 
+                            } fm 
+        where insertValue new old =
+                 old { partOf = V.concat [ partOf old, partOf new ] }
 
-extractFileInfo :: GerritCommitEntry -> [GerritFileInfo]
-extractFileInfo (_, xs) = xs
-
-extractFile :: GerritFileInfo -> Text
-extractFile GerritFileInfo {..} = filePath -}
