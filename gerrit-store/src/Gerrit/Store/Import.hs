@@ -1,10 +1,10 @@
 {-# LANGUAGE RecordWildCards #-}
-module Gerrit.Store.Insert
-    ( insertCommitEntries
+module Gerrit.Store.Import
+    ( importCommits
     ) where
 
-import Control.Concurrent.STM (STM, atomically, modifyTVar')
 import Control.Monad (foldM)
+import Data.Hashable (hash)
 import Data.HashMap.Strict (HashMap)
 import Data.List (foldl')
 import Data.Maybe (fromJust)
@@ -12,10 +12,34 @@ import Data.Text (Text)
 import Gerrit.Source.Types
 import Gerrit.Store.Types
 import qualified Data.HashMap.Strict as HashMap
-import qualified Data.HashSet as HashSet
+import qualified Data.HashSet as HS
 import qualified Data.Vector as Vector
 
-type TempFileMap = HashMap Text [CommitEntry]
+-- | A temporary file map that will
+type TempFileMap = HashMap FileHash (Text, [CommitEntry])
+
+importCommits :: [GerritCommitEntry] -> CommitStore -> CommitStore
+importCommits entries store@CommitStore {..} =
+    let (commitSet', entries') = foldl' syncWithCommits
+                                        (commitSet, []) entries
+    in store 
+
+-- | Sync a gerrit commit entry with the commit set. If the entry already
+-- is present it will be discarded. If not present it will be kept and
+-- the commit id will be stored in the commit set.
+syncWithCommits :: (CommitSet, [GerritCommitEntry])
+                -> GerritCommitEntry
+                -> (CommitSet, [GerritCommitEntry])
+syncWithCommits acc@(cs, xs) entry@(GerritCommitInfo {..}, _)
+    | not (HS.member changeId cs) = (HS.insert changeId cs, entry:xs)
+    | otherwise                   = acc
+
+processEntry :: (TempFileMap, [CommitEntry])
+             -> GerritCommitEntry
+             -> (TempFileMap, [CommitEntry])
+processEntry = undefined
+
+{-type TempFileMap = HashMap Text [CommitEntry]
 
 insertCommitEntries :: [GerritCommitEntry] -> CommitData -> IO CommitData
 insertCommitEntries xs CommitData {..} = do
@@ -91,4 +115,4 @@ extractFileInfo :: GerritCommitEntry -> [GerritFileInfo]
 extractFileInfo (_, xs) = xs
 
 extractFile :: GerritFileInfo -> Text
-extractFile GerritFileInfo {..} = filePath
+extractFile GerritFileInfo {..} = filePath -}

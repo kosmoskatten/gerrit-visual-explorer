@@ -1,15 +1,13 @@
 module Gerrit.Store.Types
-    ( CommitData (..)
+    ( CommitStore (..)
     , CommitEntry (..)
     , Change (..)
     , File (..)
-    , CommitSet 
-    , FileMap
-    , emptyCommitData
-    , emptyFile
+    , CommitSet
+    , FileHash
+    , emptyStore
     ) where
 
-import Control.Concurrent.STM (STM, TVar, newTVar)
 import Data.HashMap.Strict (HashMap)
 import Data.HashSet (HashSet)
 import Data.Text (Text)
@@ -19,46 +17,69 @@ import qualified Data.HashMap.Strict as HashMap
 import qualified Data.HashSet as HashSet
 import qualified Data.Vector as Vector
 
-data CommitEntry = 
-        CommitEntry { timeStamp :: !UTCTime
-                    , commitId  :: !Text
-                    , subject   :: !Text
-                    , changes   :: !(Vector Change)
+-- | A timeline of commits.
+type TimeLine = Vector CommitEntry
+
+-- | A filename hash. Compact representation of a file.
+type FileHash = Int
+
+-- | A FileMap, where files are addressed using their hash values.
+type FileMap = HashMap FileHash File
+
+-- | A HashSet, to keep track of all stored commits without the need
+-- to search the complete timeline.
+type CommitSet = HashSet Text
+
+-- | The commit store.
+data CommitStore =
+        CommitStore { timeLine  :: !TimeLine
+                    -- ^ The main timeline of commits.
+                    , fileMap   :: !FileMap
+                    -- ^ The file map addressed using file hashes.
+                    , commitSet :: !CommitSet
+                    -- ^ The complete set of commits collected in a set
+                    -- for fast lookup.
                     }
     deriving Show
 
-data Change =
+-- | Entry representing one commit in the store.
+data CommitEntry =
+        CommitEntry { timeStamp :: !UTCTime
+                    -- ^ The timestamp is the latest update time from
+                    -- Gerrit.
+                    , commitId  :: !Text
+                    -- ^ The "long form" commit id including project and
+                    -- branch details.
+                    , subject   :: !Text
+                    -- ^ The subject of the commit.
+                    , changes   :: !(Vector Change)
+                    -- ^ The sequence of changes included in this commit.
+                    }
+    deriving Show
+
+-- | Representation of one change.
+data Change = 
         Change { insertions :: {-# UNPACK #-} !Int
+               -- ^ The number of insertions for the change.
                , deletions  :: {-# UNPACK #-} !Int
-               , file       :: !File
+               -- ^ The number of deletions for the change.
+               , fileRef    :: {-# UNPACK #-} !FileHash
+               -- ^ The hash number reference to the file in the FileMap.
                }
     deriving Show
 
-data File = 
-    File { name   :: !Text
-         , partOf :: TVar TimeLine
-         -- ^ The timeline shall be mutable. Its mutable by means
-         -- of TVar. 
-         }
-
-instance Show File where
-    show f = ""
-
-type TimeLine  = Vector CommitEntry
-type FileMap   = HashMap Text File
-type CommitSet = HashSet Text
-
-data CommitData =
-        CommitData { timeLine  :: !TimeLine
-                   , fileMap   :: !FileMap
-                   , commitSet :: !CommitSet
-                   }
+-- | Representation of one file.
+data File =
+        File { name   :: !Text
+             -- ^ The file's name.
+             , partOf :: !TimeLine
+             -- ^ The timeline of the commits the file is part of.
+             }
     deriving Show
 
-emptyCommitData :: CommitData
-emptyCommitData = CommitData { timeLine  = Vector.empty
-                             , fileMap   = HashMap.empty
-                             , commitSet = HashSet.empty } 
-
-emptyFile :: Text -> STM File
-emptyFile name' = File name' <$> newTVar Vector.empty
+-- | Make an empty store.
+emptyStore :: CommitStore
+emptyStore = CommitStore { timeLine  = Vector.empty
+                         , fileMap   = HashMap.empty
+                         , commitSet = HashSet.empty
+                         }
