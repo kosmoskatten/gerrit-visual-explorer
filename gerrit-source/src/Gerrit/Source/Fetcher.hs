@@ -1,12 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Gerrit.Source.Fetcher
     ( fetchCommits
-    , fetchCommitInfo
-    , fetchFileInfo
     ) where
 
 import Control.Monad (forM)
-import Data.Aeson (decode)
+import Data.Aeson (FromJSON, decode)
 import Data.Aeson.Types (Object, Value (..), (.:), parseMaybe)
 import Data.ByteString (ByteString)
 import Gerrit.Source.Types ( GerritCommitInfo (..)
@@ -39,6 +37,11 @@ fetchCommits :: Server -> Credentials -> GerritCommitFilter
              -> IO (Maybe [GerritCommitEntry]) 
 fetchCommits = undefined
 
+getJSON :: FromJSON a => Manager -> Server -> Url -> Credentials 
+        -> IO (Maybe a)
+getJSON = undefined
+
+{-
 -- | Fetch commit info from the specified server.
 fetchCommitInfo :: Manager -> Server -> IO (Maybe [GerritCommitInfo])
 fetchCommitInfo mgr server = 
@@ -104,3 +107,5 @@ fileInfo obj =
 fileChanges :: Object -> Maybe (Int, Int)
 fileChanges obj = flip parseMaybe obj $ 
     \o -> (,) <$> o .: "lines_inserted" <*> o .: "lines_deleted"
+
+-}
