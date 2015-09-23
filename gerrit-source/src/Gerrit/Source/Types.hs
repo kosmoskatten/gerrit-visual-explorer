@@ -4,6 +4,7 @@
 module Gerrit.Source.Types
     ( GerritCommitInfo (..)
     , GerritFileInfo (..)
+    , GerritChangeMap (..)
     , GerritCommitFilter
     , GerritCommitEntry
     ) where
@@ -18,7 +19,7 @@ import qualified Data.HashMap.Strict as HM
 -- | General commit info for a Gerrit commit.
 data GerritCommitInfo = 
     GerritCommitInfo { changeId      :: !Text
-                     -- ^ The selected commit id which is change_id 
+                     -- ^ The selected commit id which is id 
                      -- from Gerrit.
                      , commitSubject :: !Text
                      -- ^ The commit's subject.
@@ -50,7 +51,7 @@ type GerritCommitEntry = (GerritCommitInfo, [GerritFileInfo])
 -- | FromJSON instance for GerritCommitInfo.
 instance FromJSON GerritCommitInfo where
     parseJSON (Object o) =
-        GerritCommitInfo <$> o .: "change_id"
+        GerritCommitInfo <$> o .: "id"
                          <*> o .: "subject"
                          <*> (read <$> o .: "updated")
     parseJSON _          = mzero
