@@ -13,6 +13,7 @@ cabal-dev
 .cabal-sandbox/
 .stack-work/
 cabal.sandbox.config
+state/
 *.prof
 *.aux
 *.hp

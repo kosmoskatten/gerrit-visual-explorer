@@ -2,7 +2,7 @@
 {-# LANGUAGE TemplateHaskell    #-}
 {-# LANGUAGE TypeFamilies       #-}
 module Gerrit.Store.Acid
-    (
+    ( AddCommits (..)
     ) where
 
 import Control.Monad.State (modify)
