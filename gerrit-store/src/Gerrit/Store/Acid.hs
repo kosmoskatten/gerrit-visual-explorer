@@ -3,8 +3,10 @@
 {-# LANGUAGE TypeFamilies       #-}
 module Gerrit.Store.Acid
     ( AddCommits (..)
+    , GetCommits (..)
     ) where
 
+import Control.Monad.Reader (ask)
 import Control.Monad.State (modify)
 import Data.Acid
 import Data.SafeCopy
@@ -23,4 +25,7 @@ $(deriveSafeCopy 0 'base ''GerritFileInfo)
 addCommits :: [GerritCommitEntry] -> Update CommitStore ()
 addCommits xs = modify (importCommits xs)
 
-$(makeAcidic ''CommitStore ['addCommits])
+getCommits :: Query CommitStore CommitStore
+getCommits = ask
+
+$(makeAcidic ''CommitStore ['addCommits, 'getCommits])
