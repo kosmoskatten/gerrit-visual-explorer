@@ -9,7 +9,7 @@ import Data.IntMap.Strict (IntMap)
 import Data.List (foldl')
 import Data.Maybe (fromJust)
 import Data.Text (Text)
-import Gerrit.Source.Types
+import Gerrit.Fetch.Types
 import Gerrit.Store.Types
 import qualified Data.IntMap.Strict as IM
 import qualified Data.Set as Set

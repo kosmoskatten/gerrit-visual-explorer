@@ -10,7 +10,7 @@ import Control.Monad.Reader (ask)
 import Control.Monad.State (modify)
 import Data.Acid
 import Data.SafeCopy
-import Gerrit.Source.Types
+import Gerrit.Fetch.Types
 import Gerrit.Store.Import
 import Gerrit.Store.Types
 import Gerrit.Store.Pure

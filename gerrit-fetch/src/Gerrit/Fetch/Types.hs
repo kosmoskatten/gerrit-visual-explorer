@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 -- | Module which declare "raw" data fetched directly from a Gerrit
 -- server.
-module Gerrit.Source.Types
+module Gerrit.Fetch.Types
     ( GerritCommitInfo (..)
     , GerritFileInfo (..)
     , GerritChangeMap (..)

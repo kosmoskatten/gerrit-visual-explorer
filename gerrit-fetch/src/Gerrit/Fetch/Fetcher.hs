@@ -1,17 +1,17 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
-module Gerrit.Source.Fetcher
+module Gerrit.Fetch.Fetcher
     ( fetchCommits
     ) where
 
 import Data.Aeson (FromJSON, decode')
 import Data.ByteString (ByteString)
-import Gerrit.Source.Types ( GerritCommitInfo (..)
-                           , GerritFileInfo (..)
-                           , GerritChangeMap (..)
-                           , GerritCommitFilter
-                           , GerritCommitEntry
-                           )
+import Gerrit.Fetch.Types ( GerritCommitInfo (..)
+                          , GerritFileInfo (..)
+                          , GerritChangeMap (..)
+                          , GerritCommitFilter
+                          , GerritCommitEntry
+                          )
 import Network.HTTP.Conduit ( Manager
                             , Request (..)
                             , httpLbs

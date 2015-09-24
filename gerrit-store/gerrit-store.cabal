@@ -25,7 +25,7 @@ library
   build-depends:       base >=4.8 && <4.9
                      , acid-state
                      , containers
-                     , gerrit-source
+                     , gerrit-fetch
                      , hashable
                      , mtl
                      , text

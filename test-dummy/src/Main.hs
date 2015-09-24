@@ -3,7 +3,7 @@ module Main
     ) where
 
 import Data.Acid
-import Gerrit.Source.Fetcher
+import Gerrit.Fetch.Fetcher
 import Gerrit.Store.Acid
 import Gerrit.Store.Types
 import System.Environment
