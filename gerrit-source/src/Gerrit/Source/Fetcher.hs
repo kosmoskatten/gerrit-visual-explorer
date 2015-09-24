@@ -74,7 +74,7 @@ getJSON mgr server url cred = do
 expand :: Url -> String
 expand (MergedChanges project) = 
     "/a/changes/?q=project:" `mappend` project 
-                             `mappend` "+branch:master+status:merged&n=2"
+                             `mappend` "+branch:master+status:merged&n=20"
 
 expand (FileList cid) =
     "/a/changes/" `mappend` cid `mappend` "/revisions/current/files/"

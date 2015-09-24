@@ -5,20 +5,20 @@ module Gerrit.Store.Import
 
 import Control.Monad (foldM)
 import Data.Hashable (hash)
-import Data.HashMap.Strict (HashMap)
+import Data.IntMap.Strict (IntMap)
 import Data.List (foldl')
 import Data.Maybe (fromJust)
 import Data.Text (Text)
 import Gerrit.Source.Types
 import Gerrit.Store.Types
-import qualified Data.HashMap.Strict as HM
-import qualified Data.HashSet as HS
+import qualified Data.IntMap.Strict as IM
+import qualified Data.Set as Set
 import qualified Data.Vector as V
 
 -- | A temporary file map that will serve as a scratchpad until updating
 -- the real FileMap. The TempFileMap works on lists instead of Vectors,
 -- and is more efficient to incrementally build up.
-type TempFileMap = HashMap FileHash (Text, [CommitEntry])
+type TempFileMap = IntMap (Text, [CommitEntry])
 
 -- | Import gerrit commits into the store.
 importCommits :: [GerritCommitEntry] -> CommitStore -> CommitStore
@@ -29,11 +29,11 @@ importCommits es CommitStore {..} =
     let (commitSet', es') = foldl' syncWithCommits (commitSet, []) es
 
         -- Next process each gerrit entry to get commit entries instead.
-        (tfm', ces)       = foldl' processEntry (HM.empty, []) es'
+        (tfm', ces)       = foldl' processEntry (IM.empty, []) es'
 
         -- Now update the FileMap where each file has its timeline of
         -- commits.
-        fileMap'          = foldl' updateFileMap fileMap (HM.toList tfm')
+        fileMap'          = foldl' updateFileMap fileMap (IM.toList tfm')
 
     -- Finally, create the new CommitStore.
     in CommitStore 
@@ -49,7 +49,7 @@ syncWithCommits :: (CommitSet, [GerritCommitEntry])
                 -> GerritCommitEntry
                 -> (CommitSet, [GerritCommitEntry])
 syncWithCommits acc@(cs, xs) entry@(GerritCommitInfo {..}, _)
-    | not (HS.member changeId cs) = (HS.insert changeId cs, entry:xs)
+    | not (Set.member changeId cs) = (Set.insert changeId cs, entry:xs)
     | otherwise                   = acc
 
 -- | Process a gerrit entry into a CommitEntry.
@@ -78,14 +78,14 @@ mkChange GerritFileInfo {..} =
 -- | Annotate a file path in the TempFileMap with a CommitEntry.
 annotateFilePath :: CommitEntry -> TempFileMap -> Text -> TempFileMap
 annotateFilePath entry tfm name = 
-    HM.insertWith insertValue (hash name) (name, [entry]) tfm 
+    IM.insertWith insertValue (hash name) (name, [entry]) tfm 
         where insertValue (_, [new]) (n, xs) = (n, new:xs)
 
 -- | Update an entry in the FileMap with contents taken from the
 -- temporary file map.
 updateFileMap :: FileMap -> (FileHash, (Text, [CommitEntry])) -> FileMap
 updateFileMap fm (key, (name', xs)) =
-    HM.insertWith insertValue key 
+    IM.insertWith insertValue key 
                        File { name   = name'
                             , partOf = V.fromList xs 
                             } fm 

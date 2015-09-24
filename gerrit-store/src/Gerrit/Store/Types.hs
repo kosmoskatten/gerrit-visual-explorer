@@ -4,18 +4,18 @@ module Gerrit.Store.Types
     , Change (..)
     , File (..)
     , CommitSet
-    , FileMap
     , FileHash
+    , FileMap
     , emptyStore
     ) where
 
-import Data.HashMap.Strict (HashMap)
-import Data.HashSet (HashSet)
+import Data.IntMap.Strict (IntMap)
+import Data.Set (Set)
 import Data.Text (Text)
 import Data.Time (UTCTime)
 import Data.Vector (Vector)
-import qualified Data.HashMap.Strict as HashMap
-import qualified Data.HashSet as HashSet
+import qualified Data.IntMap.Strict as IntMap
+import qualified Data.Set as Set
 import qualified Data.Vector as Vector
 
 -- | A timeline of commits.
@@ -25,11 +25,11 @@ type TimeLine = Vector CommitEntry
 type FileHash = Int
 
 -- | A FileMap, where files are addressed using their hash values.
-type FileMap = HashMap FileHash File
+type FileMap = IntMap File
 
 -- | A HashSet, to keep track of all stored commits without the need
 -- to search the complete timeline.
-type CommitSet = HashSet Text
+type CommitSet = Set Text
 
 -- | The commit store.
 data CommitStore =
@@ -81,6 +81,6 @@ data File =
 -- | Make an empty store.
 emptyStore :: CommitStore
 emptyStore = CommitStore { timeLine  = Vector.empty
-                         , fileMap   = HashMap.empty
-                         , commitSet = HashSet.empty
+                         , fileMap   = IntMap.empty
+                         , commitSet = Set.empty
                          }
