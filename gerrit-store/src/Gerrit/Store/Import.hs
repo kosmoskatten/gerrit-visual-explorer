@@ -1,6 +1,6 @@
 {-# LANGUAGE RecordWildCards #-}
 module Gerrit.Store.Import
-    ( importCommits
+    ( prependCommits
     ) where
 
 import Control.Monad (foldM)
@@ -20,10 +20,11 @@ import qualified Data.Vector as V
 -- and is more efficient to incrementally build up.
 type TempFileMap = IntMap (Text, [CommitEntry])
 
--- | Import gerrit commits into the store.
-importCommits :: [GerritCommitEntry] -> CommitStore -> CommitStore
-importCommits [] store            = store
-importCommits es CommitStore {..} =
+-- | Import and prepent gerrit commits into the store. The timeline is
+-- ordered with the latest commits first.
+prependCommits :: [GerritCommitEntry] -> CommitStore -> CommitStore
+prependCommits [] store            = store
+prependCommits es CommitStore {..} =
     -- First. Make sure to filter commits that already are present, and
     -- update the commit set with the new commits.
     let (commitSet', es') = foldl' syncWithCommits (commitSet, []) es
@@ -37,7 +38,7 @@ importCommits es CommitStore {..} =
 
     -- Finally, create the new CommitStore.
     in CommitStore 
-       { timeLine  = V.concat [ timeLine, V.fromList ces]
+       { timeLine  = V.concat [ V.fromList ces, timeLine ]
        , fileMap   = fileMap'
        , commitSet = commitSet'
        }
@@ -90,5 +91,5 @@ updateFileMap fm (key, (name', xs)) =
                             , partOf = V.fromList xs 
                             } fm 
         where insertValue new old =
-                 old { partOf = V.concat [ partOf old, partOf new ] }
+                 old { partOf = V.concat [ partOf new, partOf old ] }
 

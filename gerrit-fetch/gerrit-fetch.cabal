@@ -38,7 +38,7 @@ test-suite gerrit-source-test
   other-modules:       DecoderTests
   build-depends:       base >=4.8 && <4.9
                      , aeson
-                     , gerrit-source
+                     , gerrit-fetch
                      , HUnit
                      , test-framework
                      , test-framework-hunit

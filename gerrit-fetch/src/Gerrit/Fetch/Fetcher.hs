@@ -23,10 +23,13 @@ import Network.HTTP.Conduit ( Manager
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import qualified Data.Text as T
 
+-- | Convenience types.
 type Credentials = ByteString
 type Project     = String
 type Server      = String
 
+-- | Typesafe URL helper for accessing Gerrit server resources. Either
+-- getting the list of merged changes of getting a file map for a commit.
 data Url = MergedChanges !String
          | FileList !String
     deriving Show
@@ -40,7 +43,10 @@ fetchCommits server proj cred filt = do
     maybeInfos <- getJSON mgr server (MergedChanges proj) cred
     case maybeInfos of
         Just infos -> do
+            -- Make commit entries for each commit ...
             entries <- mapM (mkCommitEntry mgr server cred) =<< filt infos
+
+            -- ... eval the list of Maybes to become a Maybe list.
             return $ mapM id entries
         Nothing    -> return Nothing
 
@@ -59,6 +65,9 @@ fetchFiles mgr server cred GerritCommitInfo {..} = do
     maybeChMap <- getJSON mgr server url cred
     return $ maybe Nothing (Just . removeCommitMsg . allChanges) maybeChMap 
 
+-- | Get a JSON resource from the server. The access is protected by
+-- HTTP basic authorization. Gerrit is producing a small prefix of five
+-- bytes before real payload.
 getJSON :: FromJSON a => Manager -> Server -> Url -> Credentials 
         -> IO (Maybe a)
 getJSON mgr server url cred = do
@@ -67,7 +76,7 @@ getJSON mgr server url cred = do
     let req' = req { requestHeaders = [auth] }
     decodeIt <$> httpLbs req' mgr
       where
-        auth = ("Authorization", "Basic " `mappend` cred)
+        auth     = ("Authorization", "Basic " `mappend` cred)
         decodeIt = decode' . LBS.drop 5 . responseBody
 
 -- | Expand "typesafe" URL:s to strings.
@@ -79,5 +88,6 @@ expand (MergedChanges project) =
 expand (FileList cid) =
     "/a/changes/" `mappend` cid `mappend` "/revisions/current/files/"
 
+-- | Filter out commit message files from the file list.
 removeCommitMsg :: [GerritFileInfo] -> [GerritFileInfo]
 removeCommitMsg = filter (\f -> filePath f /= "/COMMIT_MSG")

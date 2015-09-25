@@ -7,10 +7,10 @@ module DecoderTests
 import Data.Aeson (decode)
 import Data.List (sortBy)
 import Data.Maybe (fromJust)
-import Gerrit.Source.Types ( GerritCommitInfo (..)
-                           , GerritChangeMap (..)
-                           , GerritFileInfo (..)
-                           )
+import Gerrit.Fetch.Types ( GerritCommitInfo (..)
+                          , GerritChangeMap (..)
+                          , GerritFileInfo (..)
+                          )
 import Test.HUnit
 
 -- | Test the decoding of a proper GerritCommitInfo record from
@@ -25,6 +25,7 @@ decodeGerritCommitInfo = do
     "Some task"                   @=? commitSubject info
     "2015-09-22 11:22:23.368 UTC" @=? show (updated info)
 
+-- | Test the decoding of a GerritChangeMap.
 decodeGerritChangeMap :: Assertion
 decodeGerritChangeMap = do
     -- The decoding of the change map has a number of quirks. The
