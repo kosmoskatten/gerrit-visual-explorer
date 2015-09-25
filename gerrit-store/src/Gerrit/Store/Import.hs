@@ -3,11 +3,9 @@ module Gerrit.Store.Import
     ( prependCommits
     ) where
 
-import Control.Monad (foldM)
 import Data.Hashable (hash)
 import Data.IntMap.Strict (IntMap)
 import Data.List (foldl')
-import Data.Maybe (fromJust)
 import Data.Text (Text)
 import Gerrit.Fetch.Types
 import Gerrit.Store.Types
@@ -80,7 +78,12 @@ mkChange GerritFileInfo {..} =
 annotateFilePath :: CommitEntry -> TempFileMap -> Text -> TempFileMap
 annotateFilePath entry tfm name = 
     IM.insertWith insertValue (hash name) (name, [entry]) tfm 
-        where insertValue (_, [new]) (n, xs) = (n, new:xs)
+      where
+        insertValue :: (Text, [CommitEntry]) 
+                    -> (Text, [CommitEntry])
+                    -> (Text, [CommitEntry]) 
+        insertValue (_, [new]) (n, xs) = (n, new:xs)
+        insertValue _ _                = error "Malformed pattern"
 
 -- | Update an entry in the FileMap with contents taken from the
 -- temporary file map.
