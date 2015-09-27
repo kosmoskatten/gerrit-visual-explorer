@@ -5,6 +5,7 @@ module Main
 import Data.Acid
 import Gerrit.Fetch.Fetcher
 import Gerrit.Store.Acid
+import Gerrit.Store.Analysis
 import Gerrit.Store.Types
 import System.Environment
 import qualified Data.ByteString.Char8 as BS
@@ -13,7 +14,9 @@ main :: IO ()
 main = do
     [cred] <- getArgs
     db     <- openLocalState emptyStore
-    importData db (BS.pack cred)
+    --importData db (BS.pack cred)
+    store  <- query db GetCommits
+    print (summaryPerActiveDay store)
 
 importData :: AcidState CommitStore -> BS.ByteString -> IO ()
 importData db cred= do
