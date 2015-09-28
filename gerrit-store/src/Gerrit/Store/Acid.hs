@@ -4,12 +4,23 @@
 module Gerrit.Store.Acid
     ( AddCommits (..)
     , GetCommits (..)
+    , AcidState
     , filterCommits
+    , openLocalState
+    , update
+    , query
     ) where
 
 import Control.Monad.Reader (ask)
 import Control.Monad.State (modify)
-import Data.Acid (AcidState, Update, Query, makeAcidic, query)
+import Data.Acid ( AcidState
+                 , Update
+                 , Query
+                 , openLocalState
+                 , makeAcidic
+                 , update
+                 , query
+                 )
 import Data.SafeCopy (base, deriveSafeCopy)
 import Gerrit.Fetch.Types ( GerritCommitEntry
                           , GerritCommitInfo (..)

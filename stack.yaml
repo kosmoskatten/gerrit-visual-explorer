@@ -2,5 +2,6 @@ resolver: lts-3.5
 packages:
 - ./gerrit-fetch
 - ./gerrit-store
+- ./visual-explorer
 - ./test-dummy
 extra-deps: []
