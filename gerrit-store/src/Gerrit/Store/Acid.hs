@@ -4,18 +4,21 @@
 module Gerrit.Store.Acid
     ( AddCommits (..)
     , GetCommits (..)
+    , filterCommits
     ) where
 
 import Control.Monad.Reader (ask)
 import Control.Monad.State (modify)
-import Data.Acid (Update, Query, makeAcidic)
+import Data.Acid (AcidState, Update, Query, makeAcidic, query)
 import Data.SafeCopy (base, deriveSafeCopy)
 import Gerrit.Fetch.Types ( GerritCommitEntry
-                          , GerritCommitInfo
+                          , GerritCommitInfo (..)
                           , GerritFileInfo
+                          , GerritCommitFilter
                           )
 import Gerrit.Store.Import (prependCommits)
-import Gerrit.Store.Types (Change, CommitEntry, File, CommitStore)
+import Gerrit.Store.Types (Change, CommitEntry, File, CommitStore (..))
+import qualified Data.Set as Set
 
 -- | Derive SafeCopy instances for all types.
 $(deriveSafeCopy 0 'base ''Change)
@@ -34,3 +37,10 @@ getCommits :: Query CommitStore CommitStore
 getCommits = ask
 
 $(makeAcidic ''CommitStore ['addCommits, 'getCommits])
+
+-- | Filter the list of Gerrit commits to include only the commits not
+-- present in the database.
+filterCommits :: AcidState CommitStore -> GerritCommitFilter
+filterCommits db xs = do
+    commits <- commitSet <$>  query db GetCommits
+    return $ filter (\x -> not (Set.member (changeId x) commits)) xs

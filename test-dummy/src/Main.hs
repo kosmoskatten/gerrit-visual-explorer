@@ -20,7 +20,7 @@ main = do
 
 importData :: AcidState CommitStore -> BS.ByteString -> IO ()
 importData db cred= do
-    mXs <- fetchCommits "https://gerrit.ericsson.se" "bbi/bbi" cred return
+    mXs <- fetchCommits "https://gerrit.ericsson.se" "bbi/bbi" cred $ filterCommits db
     case mXs of
         Just xs -> update db (AddCommits xs) >> print "Yay!"
         Nothing -> print "Failed!"    
