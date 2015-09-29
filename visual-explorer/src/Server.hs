@@ -20,7 +20,6 @@ import State (State (..))
 import System.Environment (getArgs, lookupEnv)
 import Text.Printf (printf)
 import qualified Data.ByteString.Char8 as BS
-import qualified Data.Vector as V
 
 main :: IO ()
 main = do
@@ -53,17 +52,34 @@ route state request = do
                handleCommitsPerActiveDay state
            | otherwise                      -> 
                handleNotAllowed ["GET"]
-        _                                  -> 
+        "/changed-files-per-active-day"
+           | requestMethod request == "GET" ->
+               handleChangedFilesPerActiveDay state
+           | otherwise                      ->
+               handleNotAllowed ["GET"]
+        _                                   -> 
             return handleNotFound
 
 handleCommitsPerActiveDay :: State -> IO Response
 handleCommitsPerActiveDay state = do
     store <- query (database state) GetCommits
     let summary = summaryPerActiveDay store
-        builder = renderCommitActivityCalender summary
+        builder = renderCommitActivityCalender 
+                    "Commits per active day" summary sumCommits
     return $ 
         responseSource status200 [("Content-Type", "text/html")]
                        (yield $ Chunk builder)
+
+handleChangedFilesPerActiveDay :: State -> IO Response
+handleChangedFilesPerActiveDay state = do
+    store <- query (database state) GetCommits
+    let summary = summaryPerActiveDay store
+        builder = renderCommitActivityCalender 
+                    "Changed files per active day" summary sumChangedFiles
+    return $ 
+        responseSource status200 [("Content-Type", "text/html")]
+                       (yield $ Chunk builder)
+
 
 handleNotAllowed :: [ByteString] -> IO Response
 handleNotAllowed allow =
@@ -75,10 +91,11 @@ handleNotFound = responseLBS status404
                              [("Content-Type", "text/plain")]
                              "Resource not found"
    
-renderCommitActivityCalender :: Vector Summary -> Builder
-renderCommitActivityCalender vec =
-    renderCalenderPageHead "Commits per active day" 
-        <> renderCalenderDrawChart "Commits per active day" vec   
+renderCommitActivityCalender :: ByteString -> Vector Summary 
+                             -> (Summary -> Int) -> Builder
+renderCommitActivityCalender title vec get =
+    renderCalenderPageHead title 
+        <> renderCalenderDrawChart title vec get
         <> renderCalenderPageFoot
 
 renderCalenderPageHead :: ByteString -> Builder
@@ -94,14 +111,15 @@ renderCalenderPageHead title =
                               \{packages:[\"calendar\"]});\n" <>
     byteString "    google.setOnLoadCallback(drawChart);\n"
 
-renderCalenderDrawChart :: ByteString -> Vector Summary -> Builder
-renderCalenderDrawChart title vec =
+renderCalenderDrawChart :: ByteString -> Vector Summary 
+                        -> (Summary -> Int) -> Builder
+renderCalenderDrawChart title vec get =
     byteString "function drawChart() {\n" <>
     byteString "  var dataTable=new google.visualization.DataTable();\n" <>
     byteString "  dataTable.addColumn({type:'date', id:'Date'});\n" <>
     byteString "  dataTable.addColumn({type:'number', id:'#'});\n" <>
     byteString "  dataTable.addRows([\n" <>
-    renderCalenderDataRows vec <>
+    renderCalenderDataRows vec get <>
     byteString "  ]);\n" <>
     byteString "  var chart=new google.visualization.Calendar(\
                      \document.getElementById('calender'));\n" <>
@@ -113,8 +131,8 @@ renderCalenderDrawChart title vec =
     byteString "  chart.draw(dataTable, options);\n" <>
     byteString "}\n"
 
-renderCalenderDataRows :: Vector Summary -> Builder
-renderCalenderDataRows vec =
+renderCalenderDataRows :: Vector Summary -> (Summary -> Int) -> Builder
+renderCalenderDataRows vec get =
     foldMap renderDataRow vec
       where
         renderDataRow :: Summary -> Builder
@@ -123,7 +141,7 @@ renderCalenderDataRows vec =
             in byteString "[ new Date(" <> intDec y <> byteString ", "
                                         <> intDec m <> byteString ", "
                                         <> intDec d <> byteString "),"
-                                        <> intDec (sumCommits summary) 
+                                        <> intDec (get summary) 
                                         <> byteString "],\n"
 
 renderCalenderPageFoot :: Builder
