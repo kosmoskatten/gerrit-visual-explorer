@@ -22,11 +22,13 @@ executable visual-explorer
   -- other-extensions:    
   build-depends:       base >=4.8 && <4.9
                      , bytestring
+                     , conduit
                      , fast-logger
                      , gerrit-fetch
                      , gerrit-store
                      , http-types
                      , time
+                     , vector
                      , wai-conduit
                      , warp
   hs-source-dirs:      src

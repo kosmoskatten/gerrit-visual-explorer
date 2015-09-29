@@ -4,7 +4,13 @@ module Main
     ) where
 
 import Data.ByteString (ByteString)
-import Gerrit.Store.Acid (openLocalState)
+import Data.ByteString.Builder (Builder, byteString, intDec)
+import Data.Conduit
+import Data.Monoid ((<>))
+import Data.Time
+import Data.Vector (Vector)
+import Gerrit.Store.Acid (GetCommits (..), openLocalState, query)
+import Gerrit.Store.Analysis (Summary (..), summaryPerActiveDay)
 import Gerrit.Store.Types (emptyStore)
 import Logger (createLogger, logMsg)
 import Network.HTTP.Types
@@ -14,6 +20,7 @@ import State (State (..))
 import System.Environment (getArgs, lookupEnv)
 import Text.Printf (printf)
 import qualified Data.ByteString.Char8 as BS
+import qualified Data.Vector as V
 
 main :: IO ()
 main = do
@@ -50,7 +57,13 @@ route state request = do
             return handleNotFound
 
 handleCommitsPerActiveDay :: State -> IO Response
-handleCommitsPerActiveDay = undefined
+handleCommitsPerActiveDay state = do
+    store <- query (database state) GetCommits
+    let summary = summaryPerActiveDay store
+        builder = renderCommitActivityCalender summary
+    return $ 
+        responseSource status200 [("Content-Type", "text/html")]
+                       (yield $ Chunk builder)
 
 handleNotAllowed :: [ByteString] -> IO Response
 handleNotAllowed allow =
@@ -61,4 +74,72 @@ handleNotFound :: Response
 handleNotFound = responseLBS status404
                              [("Content-Type", "text/plain")]
                              "Resource not found"
-    
+   
+renderCommitActivityCalender :: Vector Summary -> Builder
+renderCommitActivityCalender vec =
+    renderCalenderPageHead "Commits per active day" 
+        <> renderCalenderDrawChart "Commits per active day" vec   
+        <> renderCalenderPageFoot
+
+renderCalenderPageHead :: ByteString -> Builder
+renderCalenderPageHead title =
+    byteString "<!DOCTYPE html>\n" <>
+    byteString "<html>\n" <>
+    byteString " <head>\n" <>
+    byteString "  <title>" <> byteString title <> byteString "</title>\n" <>
+    byteString "  <script type=\"text/javascript\" \
+                      \src=\"https://www.google.com/jsapi\"></script>\n" <>
+    byteString "  <script type=\"text/javascript\">\n" <>
+    byteString "    google.load(\"visualization\", \"1.1\",\
+                              \{packages:[\"calendar\"]});\n" <>
+    byteString "    google.setOnLoadCallback(drawChart);\n"
+
+renderCalenderDrawChart :: ByteString -> Vector Summary -> Builder
+renderCalenderDrawChart title vec =
+    byteString "function drawChart() {\n" <>
+    byteString "  var dataTable=new google.visualization.DataTable();\n" <>
+    byteString "  dataTable.addColumn({type:'date', id:'Date'});\n" <>
+    byteString "  dataTable.addColumn({type:'number', id:'#'});\n" <>
+    byteString "  dataTable.addRows([\n" <>
+    renderCalenderDataRows vec <>
+    byteString "  ]);\n" <>
+    byteString "  var chart=new google.visualization.Calendar(\
+                     \document.getElementById('calender'));\n" <>
+    byteString "  var options={\n" <>
+    byteString "    title: \"" <> byteString title <> byteString "\",\n" <>
+    byteString "    height:350,\n" <>
+    byteString "    width:1000\n" <>
+    byteString "  }\n" <>
+    byteString "  chart.draw(dataTable, options);\n" <>
+    byteString "}\n"
+
+renderCalenderDataRows :: Vector Summary -> Builder
+renderCalenderDataRows vec =
+    foldMap renderDataRow vec
+      where
+        renderDataRow :: Summary -> Builder
+        renderDataRow summary =
+            let (y, m, d) = parseDay (sumDay summary) 
+            in byteString "[ new Date(" <> intDec y <> byteString ", "
+                                        <> intDec m <> byteString ", "
+                                        <> intDec d <> byteString "),"
+                                        <> intDec (sumCommits summary) 
+                                        <> byteString "],\n"
+
+renderCalenderPageFoot :: Builder
+renderCalenderPageFoot =
+    byteString "    </script>\n" <>
+    byteString "  </head>\n" <>
+    byteString "  <body>\n"  <>
+    byteString "    <div id=\"calender\"></div>\n" <>
+    byteString "  </body>\n" <>
+    byteString "</html>"
+
+-- | Parse a day to components. The month is zero indexed to be 
+-- javascript compatible.
+parseDay :: Day -> (Int, Int, Int)
+parseDay d =
+    let [(year, '-':monthS)] = reads (show d)
+        [(month, '-':dayS)]  = reads monthS
+        [(day, "")]          = reads dayS
+    in (year, month - 1, day)

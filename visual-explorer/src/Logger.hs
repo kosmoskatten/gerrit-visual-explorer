@@ -17,7 +17,7 @@ createLogger = newStdoutLoggerSet defaultBufSize
 logMsg :: LoggerSet -> String -> IO ()
 logMsg logger str = do
     now <- getCurrentTime
-    let logStr = toLogStr (show now) `mappend` toLogStr " : " 
+    let logStr = toLogStr (show now) `mappend` toLogStr (" : " :: String) 
                                      `mappend` toLogStr str
     pushLogStrLn logger logStr
 

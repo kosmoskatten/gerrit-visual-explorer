@@ -1,6 +1,7 @@
 {-# LANGUAGE RecordWildCards #-}
 module Gerrit.Store.Analysis
-    ( summaryPerActiveDay
+    ( Summary (..)
+    , summaryPerActiveDay
     ) where
 
 import Data.Map.Strict (Map)
